@@ -78,30 +78,38 @@ void TrafficLight::cycleThroughPhases()
     std::default_random_engine generator;
     std::uniform_int_distribution<int> distribution(4000, 6000);
 
+    auto lastUpdate = std::chrono::system_clock::now();
+
     while (true)
     {
-        auto start = std::chrono::system_clock::now();
 
-        if (getCurrentPhase() == TrafficLightPhase::red)
-        {
-            setCurrentPhase(TrafficLightPhase::green);
-        std::cout << "TrafficLight #" << _id << " changed to GREEN" << std::endl;
-        }
-        else
-        {
-            setCurrentPhase(TrafficLightPhase::red);
-        std::cout << "TrafficLight #" << _id << " changed to RED" << std::endl;
-        }
-
-        _messageQueue.send(std::move(getCurrentPhase()));
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(distribution(generator)));
-
-        auto stop = std::chrono::system_clock::now();
-        auto duration = std::chrono::duration<double>(stop - start);
-        std::cout << "TrafficLight #" << _id << " duration was: " << duration.count() << " sec" << std::endl;
-
-        // I dont get why i need to wait here again? -> still do it to fulfill the requirements
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        auto cycleDuration = distribution(generator);
+
+        long timeSinceLastUpdate = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - lastUpdate).count();
+        if (timeSinceLastUpdate >= cycleDuration)
+        {
+
+            if (getCurrentPhase() == TrafficLightPhase::red)
+            {
+                setCurrentPhase(TrafficLightPhase::green);
+                std::cout << "TrafficLight #" << _id << " changed to GREEN" << std::endl;
+            }
+            else
+            {
+                setCurrentPhase(TrafficLightPhase::red);
+                std::cout << "TrafficLight #" << _id << " changed to RED" << std::endl;
+            }
+
+            _messageQueue.send(std::move(getCurrentPhase()));
+
+            auto stop = std::chrono::system_clock::now();
+            auto durationCount = std::chrono::duration<double>(stop - lastUpdate).count();
+            std::cout << "TrafficLight #" << _id << " duration was: " << durationCount << " sec" << std::endl;
+
+            // reset stop watch for next cycle
+            lastUpdate = std::chrono::system_clock::now();
+        }
     }
 }
