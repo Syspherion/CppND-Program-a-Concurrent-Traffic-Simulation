@@ -5,21 +5,30 @@
 
 /* Implementation of class "MessageQueue" */
 
-/*
 template <typename T>
 T MessageQueue<T>::receive()
 {
     // FP.5a : The method receive should use std::unique_lock<std::mutex> and _condition.wait()
     // to wait for and receive new messages and pull them from the queue using move semantics.
     // The received object should then be returned by the receive function.
+    std::unique_lock<std::mutex> uniqueLock(_mutex);
+    _condition.wait(uniqueLock, [this]
+                    { return !_queue.empty(); });
+
+    T msg = std::move(_queue.front());
+    _queue.pop_front();
+
+    return msg;
 }
-*/
 
 template <typename T>
 void MessageQueue<T>::send(T &&msg)
 {
     // FP.4a : The method send should use the mechanisms std::lock_guard<std::mutex>
     // as well as _condition.notify_one() to add a new message to the queue and afterwards send a notification.
+    std::lock_guard<std::mutex> lockGuard(_mutex);
+    _queue.push_back(std::move(msg));
+    _condition.notify_one();
 }
 
 /* Implementation of class "TrafficLight" */
@@ -33,6 +42,13 @@ void TrafficLight::waitForGreen()
     // FP.5b : add the implementation of the method waitForGreen, in which an infinite while-loop
     // runs and repeatedly calls the receive function on the message queue.
     // Once it receives TrafficLightPhase::green, the method returns.
+    while (true)
+    {
+        if (_messageQueue.receive() == TrafficLightPhase::green)
+        {
+            return;
+        }
+    }
 }
 
 TrafficLightPhase TrafficLight::getCurrentPhase()
@@ -76,12 +92,12 @@ void TrafficLight::cycleThroughPhases()
         }
 
         _messageQueue.send(std::move(getCurrentPhase()));
-       
+
         std::this_thread::sleep_for(std::chrono::milliseconds(distribution(generator)));
 
         auto stop = std::chrono::system_clock::now();
         auto duration = std::chrono::duration<double>(stop - start);
-        std::cout << "The Cycleduration was = " << duration.count() << " sec" << std::endl;
+        std::cout << "TrafficLight #" << _id << " duration was: " << duration.count() << " sec" << std::endl;
 
         // I dont get why i need to wait here again? -> still do it to fulfill the requirements
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
